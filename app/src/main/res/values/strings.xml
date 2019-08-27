@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">MqttDemo</string>
+    <string name="toConnect">请先连接服务器</string>
+    <string name="connected">断开连接</string>
+    <string name="disConnectSuccess">断开连接成功</string>
+    <string name="connecting">正在连接</string>
+    <string name="pleaseConnected">请先连接</string>
+    <string name="subscribed">取消订阅主题</string>
+    <string name="toSubscribe">订阅主题</string>
+    <string name="publish">发布事件</string>
+    <string name="publishBig">发布大量事件</string>
+    <string name="inputContent">输入消息内容</string>
+    <string name="contentIsNull">消息不能为空</string>
+    <string name="dialogTitle">发布消息</string>
+    <string name="dialogOk">发布</string>
+    <string name="dialogCancel">取消</string>
+
+</resources>
