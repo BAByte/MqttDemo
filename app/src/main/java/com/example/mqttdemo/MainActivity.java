@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -34,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private String serverUri = "tcp://172.18.90.20:1883";
 
     // 客户端 ID，用以识别客户端，该id必须为唯一，否则两个客户端会不断的重连，所以使用sn码效果会更好
-    private String clientId = android.os.Build.SERIAL;
+    private String clientId;
 
     // 订阅的主题名称,该主题名称可自定义
     final String subscriptionTopic = "newNotification";
@@ -77,12 +78,9 @@ public class MainActivity extends AppCompatActivity {
                 // 自动重连连接成功
                 Log.d(TAG, "connectComplete: ");
                 connect.setText(R.string.connected);
-                if (isSubscribe){
+                if (isSubscribe) {
                     subscribeToTopic();
                 }
-            } else {
-                // 第一次连接成功
-
             }
         }
 
@@ -98,8 +96,11 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void messageArrived(String topic, MqttMessage message) {
             // 消息到达
-            Log.d(TAG, "messageArrived: "+topic+";;;"+message);
-            fillingView(topic,message);
+            Log.d(TAG, "messageArrived: " + topic + "：：" + message);
+
+            //我使用的是scrollView,来直观的显示是否能收到消息，如果是测试大量并发，注释掉这行
+            fillingView(topic, message);
+
         }
 
         @Override
@@ -115,10 +116,11 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         initView();
+        clientId = android.os.Build.SERIAL;
     }
 
     private void initView() {
-        scrollView=findViewById(R.id.scrollView);
+        scrollView = findViewById(R.id.scrollView);
 
         connect = findViewById(R.id.connect);
         connect.setOnClickListener(new View.OnClickListener() {
@@ -128,12 +130,11 @@ public class MainActivity extends AppCompatActivity {
                     if (isConnect()) {
                         connect.setText(R.string.toConnect);
                         mqttAndroidClient.disconnect();
-                        isSubscribe=false;
+                        isSubscribe = false;
                         subscribe.setText(R.string.toSubscribe);
-                        mqttAndroidClient=null;
+                        mqttAndroidClient = null;
                         return;
                     }
-
 
                     //初始化连接器
                     initMQTT();
@@ -152,10 +153,10 @@ public class MainActivity extends AppCompatActivity {
         subscribe.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (isSubscribe){
+                if (isSubscribe) {
                     subscribe.setText(R.string.toSubscribe);
                     unSubscribe();
-                    isSubscribe=false;
+                    isSubscribe = false;
                     return;
                 }
 
@@ -172,7 +173,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        Button publishBig=findViewById(R.id.publishBig);
+        Button publishBig = findViewById(R.id.publishBig);
         publishBig.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -183,23 +184,10 @@ public class MainActivity extends AppCompatActivity {
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        MqttMessage mqttMessage = new MqttMessage("3".getBytes());
-                        for (int i=0;i<1000;i++){
+                        for (int i = 0; i < 10000; i++) {
                             try {
-                                mqttAndroidClient.publish(subscriptionTopic,mqttMessage);
-                            } catch (MqttException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    }
-                }).start();
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        MqttMessage mqttMessage = new MqttMessage("2".getBytes());
-                        for (int i=0;i<100;i++){
-                            try {
-                                mqttAndroidClient.publish(subscriptionTopic,mqttMessage);
+                                MqttMessage mqttMessage = new MqttMessage((i + "").getBytes());
+                                mqttAndroidClient.publish(subscriptionTopic, mqttMessage);
                             } catch (MqttException e) {
                                 e.printStackTrace();
                             }
@@ -209,8 +197,6 @@ public class MainActivity extends AppCompatActivity {
 
             }
         });
-
-
     }
 
     private void initMQTT() {
@@ -288,14 +274,14 @@ public class MainActivity extends AppCompatActivity {
                 public void onSuccess(IMqttToken asyncActionToken) {
                     //订阅成功的回调
                     subscribe.setText(R.string.subscribed);
-                    isSubscribe=true;
+                    isSubscribe = true;
                 }
 
                 @Override
                 public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
                     //订阅石板的回调
                     subscribe.setText(R.string.toSubscribe);
-                    isSubscribe=false;
+                    isSubscribe = false;
                 }
             });
         } catch (MqttException e) {
@@ -348,7 +334,18 @@ public class MainActivity extends AppCompatActivity {
 
                         try {
                             String m = et.getText().toString();
-                            MqttMessage mqttMessage = new MqttMessage(m.getBytes());
+                            MqttMessage mqttMessage = new MqttMessage();
+                            mqttMessage.setPayload(m.getBytes());
+
+                            //这个代表设置粘性事件
+                            //  mqttMessage.setRetained(true);
+
+                            //想要取消粘性事件，要这样构建消息
+//                            String m = et.getText().toString();
+//                            MqttMessage mqttMessage = new MqttMessage();
+//                            byte[] bytes={};
+//                            mqttMessage.setPayload(bytes);
+//                            mqttMessage.setRetained(true);
                             mqttAndroidClient.publish(subscriptionTopic, mqttMessage);
                         } catch (MqttException e) {
                             e.printStackTrace();
@@ -361,16 +358,17 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void fillingView(String topic,MqttMessage mqttMessage){
-        View view= LayoutInflater.from(this).inflate(R.layout.item_rv,null,false);
-        TextView subscription=view.findViewById(R.id.subscription);
-        TextView message=view.findViewById(R.id.message);
+    //向ScrollView填充数据
+    private void fillingView(String topic, MqttMessage mqttMessage) {
+        View view = LayoutInflater.from(this).inflate(R.layout.item_rv, null, false);
+        TextView subscription = view.findViewById(R.id.subscription);
+        TextView message = view.findViewById(R.id.message);
 
         subscription.setText(topic);
         message.setText(mqttMessage.toString());
 
-        LinearLayout linearLayout= scrollView.findViewById(R.id.ll_content);
-        linearLayout.addView(view,0);
+        LinearLayout linearLayout = scrollView.findViewById(R.id.ll_content);
+        linearLayout.addView(view, 0);
 
     }
 
@@ -393,12 +391,14 @@ public class MainActivity extends AppCompatActivity {
             }
     }
 
+    //断开与服务器的连接
     @Override
     protected void onDestroy() {
         super.onDestroy();
         try {
             if (mqttAndroidClient != null) {
                 mqttAndroidClient.disconnect();
+                mqttAndroidClient.close();
             }
         } catch (MqttException e) {
             e.printStackTrace();
