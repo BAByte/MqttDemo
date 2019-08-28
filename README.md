@@ -1,3 +1,7 @@
+[TOC]
+
+
+
 # 使用mosquitto和Eclipse Paho Java实现MQTT
 
 # MQTT的服务器选择
@@ -18,21 +22,20 @@
 
 实时性，大板连续发1000条给服务器一个 “1” 字符串数据，大部分情况是2秒内收完。有时候超过两秒，可能是我的网络不稳定。
 
-# 消息服务质量如何
+## 消息服务质量如何
 
 mosquitto服务器提供了3种服务质量的等级，
 
-> 
-> **（1）QoS 0(At most once)“至多一次”** 
-> 消息发布完全依赖底层 TCP/IP 网络。会发生消息丢失或重复。这一级别可用于如下情况，环境传感器数据，丢失一次读记录无所谓，因为不久后还会有第二次发送。 
->
-> **（2）QoS 1(At least once)“至少一次”** 
-> 确保消息到达，但消息重复可能会发生。 
->
-> **（3）QoS 2(Exactly once)“只有一次”** 
-> 确保消息到达一次。这一级别可用于如下情况，在计费系统中，消息重复或丢失会导致不正确的结果。小型传输，开销很小（固定长度的头部是 2 字节），协议交换最小化，以降低网络流量。 
+**（1）QoS 0(At most once)“至多一次”** 
+消息发布完全依赖底层 TCP/IP 网络。会发生消息丢失或重复。这一级别可用于如下情况，环境传感器数据，丢失一次读记录无所谓，因为不久后还会有第二次发送。 
 
-# 稳定性
+**（2）QoS 1(At least once)“至少一次”** 
+确保消息到达，但消息重复可能会发生。 
+
+**（3）QoS 2(Exactly once)“只有一次”** 
+确保消息到达一次。这一级别可用于如下情况，在计费系统中，消息重复或丢失会导致不正确的结果。小型传输，开销很小（固定长度的头部是 2 字节），协议交换最小化，以降低网络流量。 
+
+## 稳定性
 
 在我测试时连接是非常快速的，即使是网络状态发生了改变，网络重新可用后自动重连没有出现失败（有可能测试的次数不够多，网络环境不够复杂），即使是服务器重启，服务器重启成功后，客户端也能收到回调，然后进行自动重连。
 
@@ -42,11 +45,40 @@ MQTT协议在连接一定的时长后，会自动断开，但是Paho库是提供
 
 我不知道怎么控制弱网络环境这个变量，所以我找了一些资料。
 
-> ### 弱网环境下表现
->
-> 手机等终端在弱网络环境下丢包情况会非常明显，连接MQTT Server成功率很低。
->
-> 手机终端在每次TCP断开或断网后，会即刻发起TCP重连，连接成功，会重复以前步骤依次发送连接命令（CONNECT），订阅命令（SUBSCRIBLE），在弱网情况下，这个过程将会变得很昂贵
+手机等终端在弱网络环境下丢包情况会非常明显，连接MQTT Server成功率很低。
+
+手机终端在每次TCP断开或断网后，会即刻发起TCP重连，连接成功，会重复以前步骤依次发送连接命令（CONNECT），订阅命令（SUBSCRIBLE），在弱网情况下，这个过程将会变得很昂贵
+
+
+
+## 事件发送的负载是否有一定限制？
+
+这个在配置文件里是有说明的，mqtt协议限制每个数据包最大容量为256MB
+
+```java
+# This option sets the maximum publish payload size that the broker will allow.
+# Received messages that exceed this size will not be accepted by the broker.
+# The default value is 0, which means that all valid MQTT messages are
+# accepted. MQTT imposes a maximum payload size of 268435455 bytes.
+```
+
+## 是否支持粘性事件
+
+消息持久性(Retain )
+作用：服务器存储消息，推送给未来的订阅者。
+Retain 持久消息（粘性消息）
+RETAIN 标记：每个Publish消息都需要指定的标记
+0 —— 服务端不能存储这个消息，也不能移除或替换任何 现存的保留消息
+1 —— 服务端必须存储这个应用消息和它的QoS等级，以便它可以被分发给未来的订阅者
+每个Topic只会保留最多一个 Retain 持久消息
+客户端订阅带有持久消息的Topic，会立即受到这条消息
+服务器可以选择丢弃持久消息，比如内存或者存储吃紧的时候
+如果客户端想要删除某个Topic 上面的持久消息，可以向这个Topic发送一个Payload为空的持久消息
+遗嘱消息（Will）的Retain持久机制同理
+
+## 当一个事件到来的时候，是否多个观察者都可以收到？
+
+可以，服务器可以主动向终端发事件，终端能主动向服务器发事件，会有对应的回调
 
 ## WebSocket Support？
 
@@ -56,7 +88,7 @@ MQTT协议在连接一定的时长后，会自动断开，但是Paho库是提供
 
 IBM的MQTT文档：https://www.ibm.com/developerworks/cn/websphere/library/techarticles/1308_xiangr_mqtt/1308_xiangr_mqtt.html
 
-## 不同的MQTT服务器并发测试
+# 不同的MQTT服务器并发测试
 
 注意：一个网上的大神测试的，我来不及装那么多服务器，
 
@@ -114,70 +146,91 @@ IBM的MQTT文档：https://www.ibm.com/developerworks/cn/websphere/library/techa
 
 # mosquitto + Paho在大板上的并发测试
 
+注：客户端发送和订阅事件分为下面几种，而我只测试了同步客户端和异步客户端
+
+| 基类                  | 介绍                                                         |
+| --------------------- | ------------------------------------------------------------ |
+| MqttClient            | 同步调用客户端，使用阻塞方法与MQTT服务器通信。               |
+| MqttAsyncClient       | 异步调用客户端，使用非阻塞方法与MQTT服务器通信，允许操作在后台运行。 |
+| MqttClientPersistence | 表示持久性数据存储，用于存储正在传输的出站和入站消息，从而实现向指定的[QoS](https://www.jianshu.com/p/73d9c6668dfc)的传递。 可以使用 MqttClient指定此接口的实现，MqttClient将使用该实现来持久保存QoS为1和2消息。 |
+| MqttConnectOptions    | 保存控制客户端连接到服务器的方式的选项集，包括用户名、密码等。 |
+| MqttMessage           | MQTT消息，保存应用程序有效负载和指定消息如何传递的选项消息。 |
+
+
+
+## 使用同步客户端发送，同步客户端接收
+
+注意，下面都是发送一个 "1"字符串
+
 条件：从大板发出消息，电脑运行的模拟器接收
 
-> 测试次数：3
-> mosquitto:
+> 测试次数：10
+> 服务器：mosquitto
 >
 > 发送消息：10000条  QoS0: 2分18秒 会丢包
 
 条件：电脑运行的模拟器发出消息，大板接收
 
-> 测试次数：3
-> mosquitto:
+> 测试次数：10
+> 服务器： mosquitto
 >
 > 发送消息：10000条  QoS0: 1分49秒 ，会丢包
 
 条件：大板自发自收
 
-> 测试次数：3
-> mosquitto:
+> 测试次数：10
+> 服务器：mosquitto
 >
 > 发送消息：10000条  QoS0: 20秒 ，会丢包
 
 条件：模拟器自发自收
 
-> 测试次数：3
-> mosquitto:
+> 测试次数：10
+> 服务器：mosquitto
 >
 > 发送消息：10000条  QoS0: 13秒 ，会丢包
 
 可以看到自发自收和两个不同终端之间发送接收差别是很大的，和网络有一定的关系，所以上面的大佬的测试应该是属于在自己电脑上自发自收了。
 
-## 事件发送的负载是否有一定限制？
+其实上面是个发消息也是个耗时操作，这里面的时间肯定包含了等待发送的时间。所以我接下来模拟多个客户端发送,一个客户端接收的情况来进行测试
 
-这个在配置文件里是有说明的，mqtt协议限制每个数据包最大容量为256MB
+## 使用异步客户端发送，同步客户端接收
 
-```java
-# This option sets the maximum publish payload size that the broker will allow.
-# Received messages that exceed this size will not be accepted by the broker.
-# The default value is 0, which means that all valid MQTT messages are
-# accepted. MQTT imposes a maximum payload size of 268435455 bytes.
-```
+注意，下面都是发送一个 "1"字符串
+
+条件：从大板使用单个异步客户端发出消息，电脑运行的模拟器接收，模拟一个终端大量发送数据，这验证了大板中单个MQTT客户端发出消息的性能如何了。
+
+> 测试次数：10
+> 服务器： mosquitto
+>
+> 发送消息：10000条  QoS0: 50秒 会丢包，但是丢的较少
 
 
 
-## 是否支持粘性事件
+我没去尝试多个不同的终端设备作为客户端发出消息的性能，设备不够，只能委曲求全了，使用模拟器来（这样的测试可能并没有实际参考意义，因为是在同一台电脑上跑的模拟器）：
 
-> 消息持久性(Retain )
-> 作用：服务器存储消息，推送给未来的订阅者。
-> Retain 持久消息（粘性消息）
-> RETAIN 标记：每个Publish消息都需要指定的标记
-> 0 —— 服务端不能存储这个消息，也不能移除或替换任何 现存的保留消息
-> 1 —— 服务端必须存储这个应用消息和它的QoS等级，以便它可以被分发给未来的订阅者
-> 每个Topic只会保留最多一个 Retain 持久消息
-> 客户端订阅带有持久消息的Topic，会立即受到这条消息
-> 服务器可以选择丢弃持久消息，比如内存或者存储吃紧的时候
-> 如果客户端想要删除某个Topic 上面的持久消息，可以向这个Topic发送一个Payload为空的持久消息
-> 遗嘱消息（Will）的Retain持久机制同理
+条件：使用电脑运行多个模拟器使用异步客户端发出消息，大板接收，模拟多个终端发送数据
 
-## 当一个事件到来的时候，是否多个观察者都可以收到？
+> 测试次数：10
+> 服务器： mosquitto
+>
+> 发送消息：两个终端各发5000条  QoS0: 35秒 会丢包，但是丢的较少
 
-可以，服务器可以主动向终端发事件，终端能主动向服务器发事件，会有对应的回调
+测试大量发送时会有这样的警告,所以Paho这个库是有设置了发布限制的
+
+~~~java
+err: 正在进行过多的发布 (32202)
+2019-08-28 16:44:52.749 2089-2292/com.example.mqttdemo W/System.err:     at org.eclipse.paho.client.mqttv3.internal.ClientState.send(ClientState.java:513)
+2019-08-28 16:44:52.749 2089-2292/com.example.mqttdemo W/System.err:     at org.eclipse.paho.client.mqttv3.internal.ClientComms.internalSend(ClientComms.java:158)
+2019-08-28 16:44:52.749 2089-2292/com.example.mqttdemo W/System.err:     at org.eclipse.paho.client.mqttv3.internal.ClientComms.sendNoWait(ClientComms.java:187)
+2019-08-28 16:44:52.749 2089-2292/com.example.mqttdemo W/System.err:     at org.eclipse.paho.client.mqttv3.MqttAsyncClient.publish(MqttAsyncClient.java:1355)
+~~~
+
+
 
 # 配置MQTT服务器的方法
 
-### macBook下mosquitto配置方法
+## macBook下mosquitto配置方法
 
 ```java
 控制台命令
@@ -200,7 +253,7 @@ IBM的MQTT文档：https://www.ibm.com/developerworks/cn/websphere/library/techa
 
 ![image](https://imgconvert.csdnimg.cn/aHR0cDovL2ltZy5ibG9nLmNzZG4ubmV0LzIwMTcwNjIyMTEwMTU0NDcw)
 
-### 终端直接调试
+## 终端直接调试
 
 ```java
 // 在 A终端 订阅
@@ -218,11 +271,9 @@ mosquitto_pub -t sensor -m 12
 
 ![image](https://imgconvert.csdnimg.cn/aHR0cDovL2ltZy5ibG9nLmNzZG4ubmV0LzIwMTcwNjIyMTExNjIwNzgy)
 
+## 网页调试
 
-
-### 网页调试
-
-## MQTTLens插件的使用
+### MQTTLens插件的使用
 
 [MQTTLens](https://link.juejin.im/?target=https%3A%2F%2Fchrome.google.com%2Fwebstore%2Fdetail%2Fmqttlens%2Fhemojaaeigabkbcookmlgmdigohjobjm%3Fhl%3Dzh-CN)
 
@@ -239,13 +290,13 @@ client ID ： 唯一ID 一般是设备唯一识别码
 
 这样服务器就配置好了。
 
-### 安卓端Eclipse Paho java库配置
+# 安卓端Eclipse Paho java库配置
 
 库的项目地址：https://github.com/eclipse/paho.mqtt.java
 
 库的文档：https://www.eclipse.org/paho/files/javadoc/index.html
 
-## android的demo
+## 该安卓demo
 
 功能简介：可以和服务端建立连接，可以向服务端发送事件，也可以接收服务端发送的事件，需要在电脑先搭建MQTT服务器，把项目连接的url改为你的服务器就能测试了。
 
@@ -257,6 +308,8 @@ client ID ： 唯一ID 一般是设备唯一识别码
 
 
 ## 使用该库所需要注意的一些小细节
+
++ 我使用的客户端是同步客户端测试的，发消息和收消息都是在ui线程的
 
 - MqttConnectOptions设置isAutomaticReconnect()为true时可自动重连， 但多个相同的ClientID同时创建连接时会无限的连接中断和自动连接,所以这里我使用的是设备的SN码作为ClientID。
 - 网络环境变化时是否会影响自动重连？当网络断开，网络又重新连接上的时候：这个会有对应回调，但是重新连接服务器后，订阅事件不会自动重新订阅，所以可以在自动重连回调接口中去判断是否需要重新订阅。

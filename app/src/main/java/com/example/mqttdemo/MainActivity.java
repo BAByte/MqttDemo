@@ -10,7 +10,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
+
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -23,6 +23,7 @@ import org.eclipse.paho.client.mqttv3.DisconnectedBufferOptions;
 import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.IMqttToken;
+
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
@@ -40,7 +41,7 @@ public class MainActivity extends AppCompatActivity {
     // 订阅的主题名称,该主题名称可自定义
     final String subscriptionTopic = "newNotification";
 
-    // MQTT 客户端
+    // MQTT 同步客户端
     private MqttAndroidClient mqttAndroidClient;
 
     //订阅参数配置
@@ -113,7 +114,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        finish();
         initView();
         clientId = android.os.Build.SERIAL;
     }
@@ -171,35 +171,10 @@ public class MainActivity extends AppCompatActivity {
                 toPublish();
             }
         });
-
-        //发布大量消息
-        Button publishBig = findViewById(R.id.publishBig);
-        publishBig.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (!isConnect()) {
-                    return;
-                }
-
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        for (int i = 0; i < 10000; i++) {
-                            try {
-                                MqttMessage mqttMessage = new MqttMessage((i + "").getBytes());
-                                mqttAndroidClient.publish(subscriptionTopic, mqttMessage);
-                            } catch (MqttException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    }
-                }).start();
-
-            }
-        });
     }
 
     private void initMQTT() {
+
         if (mqttAndroidClient != null && mqttAndroidClient.isConnected()) {
             return;
         }
@@ -252,6 +227,7 @@ public class MainActivity extends AppCompatActivity {
                 cancelProgressDialog();
                 exception.printStackTrace();
                 connect.setText(R.string.toConnect);
+                Toast.makeText(MainActivity.this, R.string.connectFail, Toast.LENGTH_SHORT).show();
 
             }
         });
@@ -261,7 +237,7 @@ public class MainActivity extends AppCompatActivity {
     private void subscribeToTopic() {
         if (!isConnect()) {
             Toast.makeText(getApplicationContext(),
-                    getResources().getString(R.string.toConnect), Toast.LENGTH_LONG).show();
+                    R.string.toConnect, Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -341,7 +317,7 @@ public class MainActivity extends AppCompatActivity {
                         String input = et.getText().toString();
                         if (input.equals("")) {
                             Toast.makeText(getApplicationContext(),
-                                    getResources().getString(R.string.contentIsNull) + input, Toast.LENGTH_LONG).show();
+                                    R.string.contentIsNull, Toast.LENGTH_LONG).show();
                             return;
                         }
 
