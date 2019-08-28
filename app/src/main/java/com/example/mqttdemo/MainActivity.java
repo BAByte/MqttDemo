@@ -89,7 +89,6 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "connectionLost: ");
             // 连接中断
             connect.setText(R.string.toConnect);
-
             subscribe.setText(R.string.toSubscribe);
         }
 
@@ -98,9 +97,8 @@ public class MainActivity extends AppCompatActivity {
             // 消息到达
             Log.d(TAG, "messageArrived: " + topic + "：：" + message);
 
-            //我使用的是scrollView,来直观的显示是否能收到消息，如果是测试大量并发，注释掉这行
+            //我使用的是scrollView,用来直观的显示是否能收到消息，如果是测试大量并发，注释掉这行
             fillingView(topic, message);
-
         }
 
         @Override
@@ -115,6 +113,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        finish();
         initView();
         clientId = android.os.Build.SERIAL;
     }
@@ -173,6 +172,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        //发布大量消息
         Button publishBig = findViewById(R.id.publishBig);
         publishBig.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -312,6 +312,18 @@ public class MainActivity extends AppCompatActivity {
         return mqttAndroidClient.isConnected();
     }
 
+
+    /**
+     * //代表设置粘性事件
+     * //  mqttMessage.setRetained(true);
+     * <p>
+     * // 想要取消粘性事件，要这样构建消息
+     * String m = et.getText().toString();
+     * MqttMessage mqttMessage = new MqttMessage();
+     * byte[] bytes = {};
+     * mqttMessage.setPayload(bytes);
+     * mqttMessage.setRetained(true);
+     */
     //发布事件
     private void toPublish() {
         if (!isConnect()) {
@@ -325,6 +337,7 @@ public class MainActivity extends AppCompatActivity {
                 .setView(et)
                 .setPositiveButton(getResources().getString(R.string.dialogOk), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
+
                         String input = et.getText().toString();
                         if (input.equals("")) {
                             Toast.makeText(getApplicationContext(),
@@ -332,20 +345,10 @@ public class MainActivity extends AppCompatActivity {
                             return;
                         }
 
+                        String m = et.getText().toString();
+                        MqttMessage mqttMessage = new MqttMessage();
+                        mqttMessage.setPayload(m.getBytes());
                         try {
-                            String m = et.getText().toString();
-                            MqttMessage mqttMessage = new MqttMessage();
-                            mqttMessage.setPayload(m.getBytes());
-
-                            //这个代表设置粘性事件
-                            //  mqttMessage.setRetained(true);
-
-                            //想要取消粘性事件，要这样构建消息
-//                            String m = et.getText().toString();
-//                            MqttMessage mqttMessage = new MqttMessage();
-//                            byte[] bytes={};
-//                            mqttMessage.setPayload(bytes);
-//                            mqttMessage.setRetained(true);
                             mqttAndroidClient.publish(subscriptionTopic, mqttMessage);
                         } catch (MqttException e) {
                             e.printStackTrace();
